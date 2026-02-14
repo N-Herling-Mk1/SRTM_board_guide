@@ -1,0 +1,600 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=0.75in]{geometry}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{colortbl}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{tcolorbox}
+
+% Colors
+\definecolor{sectionblue}{HTML}{1565C0}
+\definecolor{tipgreen}{HTML}{E8F5E9}
+\definecolor{warningorange}{HTML}{FFF3E0}
+\definecolor{codegray}{HTML}{F5F5F5}
+\definecolor{tableheader}{HTML}{455A64}
+
+% Section formatting
+\titleformat{\section}{\Large\bfseries\color{sectionblue}}{\thesection}{1em}{}
+\titleformat{\subsection}{\large\bfseries\color{black}}{\thesubsection}{1em}{}
+
+% Code listing style
+\lstset{
+    backgroundcolor=\color{codegray},
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    framerule=0pt,
+    xleftmargin=10pt,
+    xrightmargin=10pt,
+}
+
+% Tip box
+\newtcolorbox{tipbox}{
+    colback=tipgreen,
+    colframe=tipgreen,
+    boxrule=0pt,
+    arc=2pt,
+    left=5pt,
+    right=5pt,
+    top=5pt,
+    bottom=5pt,
+}
+
+% Warning box
+\newtcolorbox{warningbox}{
+    colback=warningorange,
+    colframe=warningorange,
+    boxrule=0pt,
+    arc=2pt,
+    left=5pt,
+    right=5pt,
+    top=5pt,
+    bottom=5pt,
+}
+
+\begin{document}
+
+% Title Page
+\begin{center}
+{\LARGE\bfseries SRTM Board Monitoring GUI}\\[0.5cm]
+{\Large WinCC OA Setup and Configuration Guide}\\[1cm]
+
+\textbf{Prepared by:} Nathan Herling\\
+M.S. Candidate, Data Science\\
+University of Arizona\\
+nth@arizona.edu\\[0.5cm]
+
+\textbf{Assisted by:} Claude (Anthropic)\\[0.5cm]
+
+February 2026
+\end{center}
+
+\vspace{1cm}
+
+% Table of Contents
+\section*{Table of Contents}
+\begin{tabular}{l r}
+\toprule
+\textbf{Section} & \textbf{Page} \\
+\midrule
+1. OPC UA Node Discovery Tools & 2 \\
+2. Creating a New WinCC OA Project & 3 \\
+3. OPC UA Driver Configuration & 5 \\
+4. Datapoint Configuration & 6 \\
+5. GUI Panel Creation & 7 \\
+6. Key File Locations & 11 \\
+7. Quick Reference Commands & 11 \\
+\bottomrule
+\end{tabular}
+
+\newpage
+
+% Overview
+\section*{Overview}
+This guide documents the process of creating a monitoring GUI for the SRTM (Slow Rate Timing Module) board using WinCC OA. The SRTM board exposes sensor data via an OPC UA server, which WinCC OA connects to for real-time visualization.
+
+\begin{center}
+\begin{tabular}{|l|l|}
+\hline
+\rowcolor{sectionblue}\textcolor{white}{\textbf{Component}} & \textcolor{white}{\textbf{Details}} \\
+\hline
+SRTM Board & IP: 192.168.0.117 \\
+\hline
+OPC UA Server & \texttt{opc.tcp://192.168.0.117:4841} \\
+\hline
+WinCC OA Server & eepp-bigmem3.physics.arizona.edu \\
+\hline
+WinCC OA Version & 3.19 \\
+\hline
+Project Name & SRTM\_Monitor\_v3 \\
+\hline
+\end{tabular}
+\end{center}
+
+%==============================================================================
+\section{OPC UA Node Discovery Tools}
+%==============================================================================
+
+Before configuring WinCC OA, it's useful to browse the available OPC UA nodes on the SRTM board. Two Python scripts are available for this purpose:
+
+\begin{center}
+\begin{tabular}{|l|l|l|}
+\hline
+\rowcolor{green!40}\textbf{Script} & \textbf{Output} & \textbf{Description} \\
+\hline
+\texttt{browse\_opcua.py} & \texttt{opcua\_nodes.csv} & CSV format for analysis \\
+\hline
+\texttt{browse\_opcua\_to\_file\_text.py} & \texttt{opcua\_nodes.txt} & Formatted text tree view \\
+\hline
+\end{tabular}
+\end{center}
+
+\textbf{Location:} \texttt{/home/naherlin/} on eepp-bigmem3
+
+\textbf{Usage:}
+\begin{lstlisting}
+/usr/bin/python3 browse_opcua.py
+\end{lstlisting}
+
+\subsection{Exploratory Script: Reading a Single Node}
+
+Before configuring WinCC OA, you can verify OPC UA connectivity using this simple script that reads the FPGA temperature directly:
+
+\textbf{File:} \texttt{read\_fpga\_temp.py}\\
+\textbf{Location:} \texttt{/home/naherlin/}
+
+\begin{lstlisting}[language=Python]
+#!/usr/bin/python3
+from opcua import Client
+import time
+
+OPCUA_URL = "opc.tcp://192.168.0.117:4841"
+NODE_ID = "ns=2;s=SRTM.FPGA_temp"
+PING_TIME = 10  # seconds
+
+client = Client(OPCUA_URL)
+try:
+    client.connect()
+    node = client.get_node(NODE_ID)
+    for i in range(PING_TIME):
+        value = node.get_value()
+        ts = time.strftime('%Y-%m-%d %H:%M:%S')
+        print(f"{ts} | FPGA_temp = {value}")
+        time.sleep(1)
+except Exception as e:
+    print("ERROR:", e)
+finally:
+    client.disconnect()
+\end{lstlisting}
+
+\textbf{Usage:}
+\begin{lstlisting}
+/usr/bin/python3 read_fpga_temp.py
+\end{lstlisting}
+
+\begin{tipbox}
+\textbf{Tip:} This script confirms that the OPC UA server is accessible and the node path (\texttt{ns=2;s=SRTM.FPGA\_temp}) is correct before configuring WinCC OA.
+\end{tipbox}
+
+\newpage
+
+%==============================================================================
+\section{Creating a New WinCC OA Project}
+%==============================================================================
+
+\subsection{Starting the Project Administrator}
+
+Launch the Project Administrator from terminal:
+\begin{lstlisting}
+startPA
+\end{lstlisting}
+
+\subsection{Method A: Using the Project Wizard}
+
+\begin{enumerate}
+    \item Click the \textbf{New Project} button (blank document icon in toolbar)
+    \item Select \textbf{Distributed project}
+    \item Check ``I have read the SIMATIC WinCC OA Security Guideline''
+    \item Click \textbf{Next} and follow the wizard
+\end{enumerate}
+
+\begin{warningbox}
+\textbf{Important:} Use ``Distributed project'' type, NOT ``Standard project''. Standard projects cause errors in later configuration steps. Datapoints will have a \texttt{dist\_1:} prefix.
+\end{warningbox}
+
+\textbf{Note:} The wizard may fail with ``Error creating project!'' In that case, use Method B below.
+
+\subsection{Method B: Copying an Existing Project (Recommended)}
+
+If the wizard fails, copy an existing working project and update the configuration:
+
+\textbf{Step 1:} Copy the project directory
+\begin{lstlisting}
+cd ~/WinCC_Projects
+cp -r N_SRTM_test02 SRTM_Monitor_v3
+cd SRTM_Monitor_v3
+\end{lstlisting}
+
+\textbf{Step 2:} Update config/config file
+\begin{lstlisting}
+sed -i 's/N_SRTM_test02/SRTM_Monitor_v3/g' config/config
+\end{lstlisting}
+
+\textbf{Step 3:} Change pmonPort to avoid conflict
+\begin{lstlisting}
+sed -i 's/pmonPort = 4999/pmonPort = 5001/g' config/config
+\end{lstlisting}
+
+\textbf{Step 4:} Clear old log files
+\begin{lstlisting}
+rm -rf log/*
+\end{lstlisting}
+
+\textbf{Step 5:} Verify config/config
+\begin{lstlisting}
+cat config/config
+\end{lstlisting}
+
+\begin{center}
+\begin{tabular}{|l|l|}
+\hline
+\rowcolor{tableheader}\textcolor{white}{\textbf{Setting}} & \textcolor{white}{\textbf{Value}} \\
+\hline
+proj\_path & \texttt{/home/naherlin/WinCC\_Projects/SRTM\_Monitor\_v3} \\
+\hline
+pmonPort & 5001 (unique port) \\
+\hline
+distributed & 1 \\
+\hline
+\end{tabular}
+\end{center}
+
+\textbf{Step 6:} Stop the original project before starting
+
+The copied project shares default port configurations with the original. You must stop the original project first:
+\begin{lstlisting}
+pkill -u $USER -f 'OriginalProjectName'
+# Verify processes stopped:
+ps aux | grep -i wincc | grep -v grep
+\end{lstlisting}
+
+\textbf{Step 7:} Refresh startPA — the new project should appear in the list. Start it.
+
+\begin{tipbox}
+\textbf{Note:} If you need to run both projects simultaneously, add unique ports to config/config:\\
+\texttt{dataPort = 4898}\\
+\texttt{eventPort = 4899}\\
+Otherwise, the default ports will conflict.
+\end{tipbox}
+
+\begin{tipbox}
+\textbf{FYI:} To check settings from an existing project:\\
+\texttt{cat ~/WinCC\_Projects/<ProjectName>/config/config}\\[0.3cm]
+Old log files may contain references to the original project name — this is harmless. Use \texttt{grep -r 'OldName' . 2>/dev/null} to verify no critical files are affected.
+\end{tipbox}
+
+\newpage
+
+%==============================================================================
+\section{OPC UA Driver Configuration}
+%==============================================================================
+
+\begin{tipbox}
+\textbf{If you copied an existing project (Method B):} The OPC UA driver configuration is likely already set up. Open \textbf{SysMgm → Driver OPC → OPC UA Client} to verify the connection shows ``Connected'' and ``Running''. If so, skip to Section 4.
+\end{tipbox}
+
+\subsection{For New Projects}
+
+The OPC UA driver must be configured to run as driver number 2 (to avoid conflict with the simulation driver on number 1).
+
+\textbf{Edit config/progs file:}
+\begin{lstlisting}
+WCCOAopcua | always | 30 | 1 | 1 | -num 2 -host dist_1
+\end{lstlisting}
+
+\subsection{Configuring the OPC UA Connection (GUI)}
+
+\begin{enumerate}
+    \item Open \textbf{SysMgm → Driver OPC → OPC UA Client}
+    \item Click \textbf{Create} to add a new connection (or select existing)
+    \item Configure the following settings:
+\end{enumerate}
+
+\begin{center}
+\begin{tabular}{|l|l|}
+\hline
+\rowcolor{tableheader}\textcolor{white}{\textbf{Setting}} & \textcolor{white}{\textbf{Value}} \\
+\hline
+Connection Name & SRTM\_OPCUA\_D2 \\
+\hline
+Driver Number & 2 \\
+\hline
+Server URL & \texttt{opc.tcp://192.168.0.117:4841} \\
+\hline
+Security Policy & None \\
+\hline
+Authentication & Anonymous \\
+\hline
+\end{tabular}
+\end{center}
+
+\begin{enumerate}
+    \setcounter{enumi}{3}
+    \item Check \textbf{Active} checkbox
+    \item Click \textbf{Apply}
+    \item Verify \textbf{Status OPC UA Server 1} shows ``Connected'' and ``Running''
+    \item Click \textbf{Browse} to verify you can see the SRTM nodes
+    \item Click \textbf{OK}
+\end{enumerate}
+
+\textbf{OPC UA Client Configuration Window:}
+\begin{center}
+\includegraphics[width=0.8\textwidth]{images/opcua_client_config.png}
+\end{center}
+
+\textbf{Browse OPC UA Server Items:}
+\begin{center}
+\includegraphics[width=0.8\textwidth]{images/opcua_browse.png}
+\end{center}
+
+\newpage
+
+%==============================================================================
+\section{Datapoint Configuration}
+%==============================================================================
+
+\subsection{Opening PARA (Datapoint Parameterization)}
+
+Open PARA via: \textbf{SysMgm → Database → Database Configuration}
+
+\begin{tipbox}
+\textbf{If you copied an existing project (Method B):} The datapoint \texttt{SRTM\_FPGA\_temp} likely already exists. In PARA, expand \textbf{dist\_1 → ExampleDP\_Float → SRTM\_FPGA\_temp} and verify the Value column shows the current temperature (e.g., 35.967). If working, skip to Section 5.
+\end{tipbox}
+
+\subsection{Creating a New Datapoint}
+
+\begin{enumerate}
+    \item In PARA, right-click on \textbf{ExampleDP\_Float} → Create new datapoint
+    \item Configure:
+\end{enumerate}
+
+\begin{center}
+\begin{tabular}{|l|l|}
+\hline
+\rowcolor{sectionblue}\textcolor{white}{\textbf{Property}} & \textcolor{white}{\textbf{Value}} \\
+\hline
+Name & SRTM\_FPGA\_temp \\
+\hline
+Type & ExampleDP\_Float \\
+\hline
+\end{tabular}
+\end{center}
+
+\subsection{Address Configuration (Periphery Address)}
+
+The address maps the datapoint to the OPC UA node on the SRTM board:
+
+\begin{center}
+\begin{tabular}{|l|l|}
+\hline
+\rowcolor{green!40}\textbf{Property} & \textbf{Value} \\
+\hline
+Driver Number & 2 \\
+\hline
+Address Type & OPCUA \\
+\hline
+Reference & \texttt{SRTM\_OPCUA\_D2\$ns=2;s=SRTM.FPGA\_temp} \\
+\hline
+Direction & Input (1) \\
+\hline
+\end{tabular}
+\end{center}
+
+\begin{tipbox}
+\textbf{Tip:} The OPC UA node address format is: \texttt{ns=2;s=SRTM.<NodeName>}
+\end{tipbox}
+
+\textbf{PARA Window showing SRTM\_FPGA\_temp datapoint with live value:}
+\begin{center}
+\includegraphics[width=0.85\textwidth]{images/para_datapoint.png}
+\end{center}
+
+\newpage
+
+%==============================================================================
+\section{GUI Panel Creation}
+%==============================================================================
+
+\subsection{Opening the Graphics Editor (GEDI)}
+
+GEDI is typically already open when you start the project.
+
+Or from terminal:
+\begin{lstlisting}
+/opt/WinCC_OA/3.19/bin/WCCOAgedi -PROJ SRTM_Monitor_v3 &
+\end{lstlisting}
+
+\subsection{Creating a New Panel}
+
+\begin{enumerate}
+    \item \textbf{Panel → New Panel} (Ctrl+N)
+    \item Set panel size (e.g., 500 x 400) in the Property Editor
+    \item \textbf{Panel → Save Panel As...}
+    \item Save as: \texttt{FPGA\_Monitor.pnl}
+\end{enumerate}
+
+\textbf{Location:} \texttt{~/WinCC\_Projects/SRTM\_Monitor\_v3/panels/}
+
+\textbf{Panel Menu:}
+\begin{center}
+\includegraphics[width=0.5\textwidth]{images/panel_save_menu.png}
+\end{center}
+
+\subsection{Adding a Value Display}
+
+\begin{enumerate}
+    \item Select Text tool (T) from toolbar
+    \item Draw text box on panel
+    \item Select the text element
+    \item In Property Editor → Event → Initialize → click script button
+    \item Check ``Display value'' and click OK
+    \item Select datapoint: SRTM\_FPGA\_temp
+\end{enumerate}
+
+\subsection{Adding an LCD Number Display}
+
+\begin{enumerate}
+    \item \textbf{Objects → More Objects → LCD Number}
+    \item Draw the LCD area on the panel
+    \item Select the LCD widget, then in Property Editor find \textbf{Event → Initialize}
+    \item Click the script button to open the Script Editor
+    \item Enter the following Initialize script:
+\end{enumerate}
+
+\textbf{LCD Initialize Script:}
+\begin{lstlisting}
+main()
+{
+  dpConnect("updateLCD", "dist_1:SRTM_FPGA_temp.:_online.._value");
+}
+
+void updateLCD(string dp, float value)
+{
+  this.value = value;
+}
+\end{lstlisting}
+
+\begin{enumerate}
+    \setcounter{enumi}{5}
+    \item Save the script (File → Save) and close the Script Editor
+\end{enumerate}
+
+\begin{tipbox}
+\textbf{Note:} Each widget requires a datapoint binding or script to display live data. Double-clicking a widget opens its configuration. The Script Editor (shown when clicking script icons) allows custom control logic using the \texttt{dpConnect} function.
+\end{tipbox}
+
+\textbf{Widget Script Editor and Live Panel:}
+\begin{center}
+\includegraphics[width=0.85\textwidth]{images/widget_script_editor.png}
+\end{center}
+
+\subsection{Adding a Trend (Time Series Chart)}
+
+\begin{enumerate}
+    \item Objects → More Objects → Trend
+    \item Draw trend area on panel
+    \item Double-click to configure:
+\end{enumerate}
+
+\begin{center}
+\begin{tabular}{|l|l|l|}
+\hline
+\rowcolor{orange!60}\textbf{Tab} & \textbf{Setting} & \textbf{Value} \\
+\hline
+Common & Display time range & 0 Days, 0 Hours, 5 Minutes \\
+\hline
+Curve & Datapoint & SRTM\_FPGA\_temp. \\
+\hline
+Scale (Y) & Auto scale & Checked (or set Min/Max) \\
+\hline
+\end{tabular}
+\end{center}
+
+\textbf{Selecting the Datapoint for the Trend:}
+\begin{center}
+\includegraphics[width=0.85\textwidth]{images/trend_dp_selector.png}
+\end{center}
+
+\textbf{Curve Configuration with Datapoint Bound:}
+\begin{center}
+\includegraphics[width=0.8\textwidth]{images/trend_curve_config.png}
+\end{center}
+
+\subsection{Configuring the Time Scale (X-Axis)}
+
+The Trend parameterization has two ``Common'' tabs — one at the top level and one under the Curve tab. Use the \textbf{top-level Common tab} to set the display time range.
+
+\textbf{Click the top-level Common tab (highlighted):}
+\begin{center}
+\includegraphics[width=0.8\textwidth]{images/trend_common_tab.png}
+\end{center}
+
+\textbf{Set Display time range (e.g., 10 seconds):}
+\begin{center}
+\includegraphics[width=0.8\textwidth]{images/trend_time_range.png}
+\end{center}
+
+\subsection{Testing the Panel}
+
+\begin{enumerate}
+    \item Save panel: Ctrl+S
+    \item Quick Test: F5 or Panel → Save and Run in QuickTest Module (Ctrl+Q)
+\end{enumerate}
+
+\textbf{Working GUI (before time-scale adjustment):}
+\begin{center}
+\includegraphics[width=0.7\textwidth]{images/gui_before_timescale.png}
+\end{center}
+
+\textbf{After Y-bounds fixed and time-scale set to 10 seconds:}
+\begin{center}
+\includegraphics[width=0.7\textwidth]{images/gui_after_timescale.png}
+\end{center}
+
+\newpage
+
+%==============================================================================
+\section{Key File Locations}
+%==============================================================================
+
+\begin{center}
+\begin{tabular}{|l|l|}
+\hline
+\rowcolor{tableheader}\textcolor{white}{\textbf{File/Directory}} & \textcolor{white}{\textbf{Path}} \\
+\hline
+WinCC OA Installation & \texttt{/opt/WinCC\_OA/3.19/} \\
+\hline
+Project Directory & \texttt{~/WinCC\_Projects/SRTM\_Monitor\_v3/} \\
+\hline
+Config Files & \texttt{~/WinCC\_Projects/SRTM\_Monitor\_v3/config/} \\
+\hline
+Panels & \texttt{~/WinCC\_Projects/SRTM\_Monitor\_v3/panels/} \\
+\hline
+Scripts & \texttt{~/WinCC\_Projects/SRTM\_Monitor\_v3/scripts/} \\
+\hline
+OPC UA Browser Scripts & \texttt{/home/naherlin/} \\
+\hline
+Node List (CSV) & \texttt{/home/naherlin/opcua\_nodes.csv} \\
+\hline
+Node List (TXT) & \texttt{/home/naherlin/opcua\_nodes.txt} \\
+\hline
+\end{tabular}
+\end{center}
+
+%==============================================================================
+\section{Quick Reference Commands}
+%==============================================================================
+
+\begin{center}
+\begin{tabular}{|l|l|}
+\hline
+\rowcolor{sectionblue}\textcolor{white}{\textbf{Task}} & \textcolor{white}{\textbf{Command}} \\
+\hline
+Start Project Admin & \texttt{startPA} \\
+\hline
+Browse OPC UA nodes & \texttt{/usr/bin/python3 ~/browse\_opcua.py} \\
+\hline
+Check driver status & \texttt{ps aux | grep -i wincc | grep -v grep} \\
+\hline
+Kill project processes & \texttt{pkill -u \$USER -f 'ProjectName'} \\
+\hline
+\end{tabular}
+\end{center}
+
+\end{document}
