@@ -357,11 +357,31 @@ Open PARA via: \textbf{SysMgm → Database → Database Configuration}
 \textbf{If you copied an existing project (Method B):} The datapoint \texttt{SRTM\_FPGA\_temp} likely already exists. In PARA, expand \textbf{dist\_1 → ExampleDP\_Float → SRTM\_FPGA\_temp} and verify the Value column shows the current temperature (e.g., 35.967). If working, skip to Section 5.
 \end{tipbox}
 
+\subsection{Creating a New Datapoint Type}
+\begin{enumerate}
+  \item Click on the Para button (first row of buttons, currently sixth from the left)
+  \item Create a new Datapoint Type (i.e. SRTM\_float\_data)
+  \item Right click on dist\_1 at the top of the tree
+  \item Choose Create datapoint type
+  \item Right click on the folder next to newDpType
+  \item Choose the Element-type (i.e. float)
+  \item Double click on newDpType to highlight it and change the name (i.e. SRMT\_float\_data)
+\end{enumerate}
+
 \subsection{Creating a New Datapoint}
 
 \begin{enumerate}
-    \item In PARA, right-click on \textbf{ExampleDP\_Float} → Create new datapoint
-    \item Configure:
+    \item Right-click on \textbf{SRTM\_float\_data} → Create new datapoint 
+    \item Choose a name corresponding to the SRTM data (i.e. F11\_tempC)
+    \item Right click on your newly created datapoint
+    \item Choose Insert config $\to$ Periphery address
+    \item Click on the \_address config, choose the OPCUA Client Driver type and click Configure
+    \item Choose the Server SRTM (or whatever you called it)
+    \item Select the SRTM\_SUBSCRIPTIONS
+    \item Click on "Get Item" and choose from the variables from the in the drop down menu
+    \item Select the "Input" Direction
+    \item Click on the "Address active" button and hit "OK"
+
 \end{enumerate}
 
 \begin{center}
