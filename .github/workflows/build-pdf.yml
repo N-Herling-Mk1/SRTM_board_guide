@@ -15,11 +15,27 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      - name: Debug - show file structure
+        run: |
+          echo "=== Repository root ==="
+          ls -la
+          echo "=== latex/ directory ==="
+          ls -la latex/
+          echo "=== latex/images/ ==="
+          ls -la latex/images/ || echo "No images directory"
+
       - name: Compile LaTeX
         uses: xu-cheng/latex-action@v3
         with:
           root_file: SRTM_WinCC_OA_GUI_Guide.tex
           working_directory: latex
+          args: -pdf -file-line-error -interaction=nonstopmode -verbose
+
+      - name: Debug - show build outputs
+        if: always()
+        run: |
+          echo "=== LaTeX log (last 100 lines) ==="
+          tail -100 latex/SRTM_WinCC_OA_GUI_Guide.log || echo "No log file"
 
       - name: Move PDF to root
         run: cp latex/SRTM_WinCC_OA_GUI_Guide.pdf .
