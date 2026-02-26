@@ -1,4 +1,4 @@
-@'
+
 name: Build LaTeX PDF
 
 on:
@@ -31,4 +31,3 @@ jobs:
           git add SRTM_WinCC_OA_GUI_Guide.pdf
           git diff --cached --quiet || git commit -m "Auto-build PDF [skip ci]"
           git push
-'@ | Set-Content .github/workflows/build-pdf.yml
