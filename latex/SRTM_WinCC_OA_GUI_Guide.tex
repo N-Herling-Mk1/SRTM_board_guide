@@ -208,7 +208,34 @@ startPA
 \textbf{Important:} Use ``Distributed project'' type, NOT ``Standard project''. Standard projects cause errors in later configuration steps. Datapoints will have a \texttt{dist\_1:} prefix.
 \end{warningbox}
 
+
 \textbf{Note:} The wizard may fail with ``Error creating project!'' In that case, use Method B below.
+
+\subsection{Install JCOP}
+
+\begin{enumerate}
+  \item  See: jcop.web.cern.ch
+  \item Get the files
+    \begin{enumerate}
+      \item wget https://edms.cern.ch/file/1055675/9.3.0/jcop-framework-9.3.0.1.zip
+      \item wget https://edms.cern.ch/file/1085149/9.3.1/fwInstallation-9.3.1.zip
+    \end{enumerate}
+  \item copy the fwInstallation*.zip file to your project file (i.e. SRTM\_Monitor\_EC-01)
+  \item unzip fwInstallation-9.3.1.zip
+  \item Go to the location of the jcop-framework*.zip file
+  \item unzip jcop-framework-9.3.0.1.zip
+  \item Start GEDI and open the panel fwinstallation.pnl and run it
+  \item Choose the folder button and navigate to the location of the jcop-framework directory, click on the San recursively box
+  \item Click in Install box along the line that says jcop-framework
+    \begin{enumerate}
+      \item install in a subdirectory of your project (i.e. fwComps)
+    \end{enumerate}
+  \item Also install the fwCore  option
+  \item Cancel installation of other hardware stuff (i.e. Wiener)
+  \item Click on the "Install ..." button  
+\end{enumerate}
+     
+
 
 \subsection{Method B: Copying an Existing Project (Recommended)}
 
@@ -357,7 +384,54 @@ Open PARA via: \textbf{SysMgm → Database → Database Configuration}
 \textbf{If you copied an existing project (Method B):} The datapoint \texttt{SRTM\_FPGA\_temp} likely already exists. In PARA, expand \textbf{dist\_1 → ExampleDP\_Float → SRTM\_FPGA\_temp} and verify the Value column shows the current temperature (e.g., 35.967). If working, skip to Section 5.
 \end{tipbox}
 
-\subsection{Creating a New Datapoint Type}
+There are two methods for creating data points. The first uses scripts through a package called Cacophony. This is relateively automatic, but requires a bit of configuration. The second method is creating datapoints manually. The Cacophony method is preferred.
+
+\subsection{Creating Datapoints with Cacophony}
+
+\begin{enumerate}
+  \item See https://www.youtube.com/watch?v=g2LWOx1BufI at 13:40 or so
+  \item See https://github.com/quasar-team/Cacophony
+  \item cd quasar-srtm-built
+  \item git clone https://github.com/quasar-team/Cacophony.git
+  \item pip install colorama
+  \item python Cacophony/generateStuff.py --dpt\_prefix SRTM --server\_name SRTM --driver\_number 10 --subscription SRTM\_SUBSCRIPTIONS
+  \item cd Cacophony/generated
+  \item cp *.ctl ~/WinCC/SRTM\_Monitor\_EC-01/scripts/libs/
+\end{enumerate}
+
+You should be able to see the files appear in Gedi under <Project>->Libraries.
+Execute these scripts using a Panel created using Gedi
+ \begin{enumerate}
+  \item Create a new panel using the first button in Gedi (looks like a page with a + sign)
+  \item Add a pushbutton (about the middle of the first row of buttons)
+  \item In the Script panel (Part of the Property Editor) click on the script button next to the Clicked event (looks like "\{..\}")
+  \begin{enumerate}
+     \item add the line: \#uses "createDpts.ctl" at the top of the script
+     \item add the line: createDpts();
+     \item as part of the main(..) body (i.e. between the curly braces)
+  \end{enumerate}
+   \item Save and run this panel (maybe save the panel as CreateDPTs.pnl)
+   \item In the QuickTest window, click on the button. You should see an entry in the log file that says "creating DPTs for class Regs"
+   \item If you open the Para window (six button on the top row), you should now see a DPT type called SRTMRegs.
+\end{enumerate}
+
+Add another pushbutton (which I labelled "Parse Config")
+\begin{enumerate}
+   \item In the Script panel click on the script button next to Clicked event
+   \item At the top add: \#uses "configParser.ctl"
+  \begin{enumerate}
+    \item In the body of the script add: \\
+    \texttt{ parseConfig( "/home/monitor/quasar-srtm-built/build/bin/config.xml",}\\
+    \texttt{ true,}\\
+    \texttt{ true,}\\
+    \texttt{ true);}\\
+    \item Save the script and then save the panel with QuickTest
+  \end{enumerate}
+  \item Click on the Parse Config button (you should see some messages in the log panel)
+  \item This should produce a set of DPs that list all of the variables available from the SRTM (see Para)
+\end{enumerate}
+
+\subsection{Creating a New Datapoint Type Manually}
 \begin{enumerate}
   \item Click on the Para button (first row of buttons, currently sixth from the left)
   \item Create a new Datapoint Type (i.e. SRTM\_float\_data)
